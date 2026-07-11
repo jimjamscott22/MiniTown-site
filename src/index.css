@@ -1,0 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700&family=Silkscreen:wght@400;700&display=swap');
+
+:root { font-family: 'DM Sans', system-ui, sans-serif; color: #f7f2df; background: #061426; font-synthesis: none; text-rendering: optimizeLegibility; }
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; min-width: 320px; min-height: 100%; height: 100%; overflow: hidden; }
+button { font: inherit; }
+button:focus-visible { outline: 3px solid #ffd15c; outline-offset: 3px; }
