@@ -1,5 +1,5 @@
 export type ZoneType = 'residential' | 'shop' | 'workspace'
-export type Tool = 'explore' | ZoneType
+export type Tool = 'explore' | 'bulldoze' | ZoneType
 export type ConstructionStage = 'foundation' | 'frame' | 'complete'
 
 export interface GridCell { x: number; y: number }

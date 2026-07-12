@@ -10,32 +10,56 @@ const CELL_W = 132
 const CELL_H = 104
 
 interface Props {
-  blocks: Block[]; buildings: BuildingType[]; residents: Resident[]; tool: Tool; zoom: number
+  blocks: Block[]
+  buildings: BuildingType[]
+  residents: Resident[]
+  tool: Tool
+  zoom: number
+  hour: number
+  minuteInHour: number
   placeBlock: (zone: ZoneType, cells: GridCell[]) => boolean
+  demolishAtCell: (cell: GridCell) => boolean
   onInspect: (building: BuildingType | null) => void
   onZoom: (delta: number) => void
   onNotice: (message: string) => void
 }
 
-export function TownWorld({ blocks, buildings, residents, tool, zoom, placeBlock, onInspect, onZoom, onNotice }: Props) {
+function cellHasBlock(cell: GridCell, blocks: Block[]) {
+  return blocks.some((block) => block.cells.some(({ x, y }) => x === cell.x && y === cell.y))
+}
+
+export function TownWorld({
+  blocks, buildings, residents, tool, zoom, hour, minuteInHour,
+  placeBlock, demolishAtCell, onInspect, onZoom, onNotice,
+}: Props) {
   const [dragStart, setDragStart] = useState<GridCell | null>(null)
   const [dragEnd, setDragEnd] = useState<GridCell | null>(null)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const panStart = useRef<{ clientX: number; clientY: number; x: number; y: number } | null>(null)
 
   const preview = useMemo(() => dragStart && dragEnd ? getDragCells(dragStart, dragEnd) : [], [dragStart, dragEnd])
-  const validPreview = tool !== 'explore' && preview.length > 0 && canPlaceBlock(preview, blocks, COLS, ROWS)
+  const validPreview = tool !== 'explore' && tool !== 'bulldoze' && preview.length > 0 && canPlaceBlock(preview, blocks, COLS, ROWS)
   const previewKeys = new Set(preview.map(({ x, y }) => `${x}:${y}`))
 
   const startZoneDrag = (cell: GridCell, event: React.PointerEvent) => {
     if (tool === 'explore') return
+    if (tool === 'bulldoze') {
+      event.stopPropagation()
+      if (!cellHasBlock(cell, blocks)) {
+        onNotice('No building here to remove.')
+        return
+      }
+      if (demolishAtCell(cell)) onNotice('Building removed — 50% refund added to town funds.')
+      else onNotice('Could not remove that building.')
+      return
+    }
     event.stopPropagation()
     setDragStart(cell)
     setDragEnd(cell)
   }
 
   const commitPlacement = () => {
-    if (tool !== 'explore' && preview.length) {
+    if (tool !== 'explore' && tool !== 'bulldoze' && preview.length) {
       if (!validPreview) onNotice('That block needs clear, connected land.')
       else if (!placeBlock(tool, preview)) onNotice('Not enough town funds for that block.')
       else onNotice(`${preview.length}-building ${tool} block started!`)
@@ -81,14 +105,15 @@ export function TownWorld({ blocks, buildings, residents, tool, zoom, placeBlock
         <div className="plot-grid">
           {cells.map((cell) => {
             const selected = previewKeys.has(`${cell.x}:${cell.y}`)
-            return <button key={`${cell.x}:${cell.y}`} className={`plot ${selected ? `preview ${validPreview ? 'valid' : 'invalid'} ${tool}` : ''}`} style={{ left: cell.x * CELL_W, top: cell.y * CELL_H }} onPointerDown={(event) => startZoneDrag(cell, event)} onPointerEnter={() => { if (dragStart) setDragEnd(cell) }} aria-label={`Plot ${cell.x + 1}, ${cell.y + 1}`}>
+            const occupied = cellHasBlock(cell, blocks)
+            return <button key={`${cell.x}:${cell.y}`} className={`plot ${selected ? `preview ${validPreview ? 'valid' : 'invalid'} ${tool}` : ''} ${tool === 'bulldoze' && occupied ? 'bulldoze-target' : ''}`} style={{ left: cell.x * CELL_W, top: cell.y * CELL_H }} onPointerDown={(event) => startZoneDrag(cell, event)} onPointerEnter={() => { if (dragStart) setDragEnd(cell) }} aria-label={`Plot ${cell.x + 1}, ${cell.y + 1}`}>
               {selected ? <span className={`ghost-building ghost-${tool}`}><i /><i /></span> : null}
             </button>
           })}
         </div>
 
         {buildings.map((building) => <Building key={building.id} building={building} residents={residents} onInspect={onInspect} />)}
-        <WorldEntities residents={residents} />
+        <WorldEntities residents={residents} buildings={buildings} hour={hour} minuteInHour={minuteInHour} />
 
         {preview.length ? <div className={`placement-tip ${validPreview ? 'valid' : 'invalid'}`} style={{ left: Math.min(...preview.map((cell) => cell.x)) * CELL_W + 12, top: Math.max(...preview.map((cell) => cell.y)) * CELL_H + 82 }}>
           <strong>{preview.length}-building block · ${(preview.length * 400).toLocaleString()}</strong><span>{validPreview ? 'Release to build' : 'Choose clear land'}</span>
@@ -97,6 +122,6 @@ export function TownWorld({ blocks, buildings, residents, tool, zoom, placeBlock
         {!blocks.length ? <div className="empty-town-message"><span>🌱</span><strong>Your little town starts here.</strong><p>Choose a zone, then drag across up to three plots.</p></div> : null}
       </div>
     </div>
-    <div className="camera-hint">{tool === 'explore' ? 'Drag to explore · Scroll to zoom' : 'Drag across 1–3 plots · Roads appear automatically'}</div>
+    <div className="camera-hint">{tool === 'explore' ? 'Drag to explore · Scroll to zoom' : tool === 'bulldoze' ? 'Tap a building to bulldoze · 50% refund' : 'Drag across 1–3 plots · Roads appear automatically'}</div>
   </div>
 }
